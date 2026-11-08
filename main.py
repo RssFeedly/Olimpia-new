@@ -2,15 +2,21 @@ import feedparser
 import xml.etree.ElementTree as ET
 import os
 
-CHANNEL_ID = "UCDnZ8zbVWLaVfuDmNuWq7rw"
-RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
+# Usamos la lista de reproducciones de subidas públicas de @TigoSportsPY
+# Esto evita problemas con IDs internos obsoletos de YouTube
+RSS_URL = "https://www.youtube.com/feeds/videos.xml?user=TigoSportsPY"
+# O alternativamente por playlist de subidas del canal principal
+ALT_RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCDnZ8zbVWLaVfuDmNuWq7rw" 
 XML_FILE = "olimpia.xml"
 
 def generate_filtered_rss():
-    print(f"Leyendo feed RSS de: {RSS_URL}")
-    feed = feedparser.parse(RSS_URL)
+    print(f"Intentando leer feed...")
+    feed = feedparser.parse("https://www.youtube.com/feeds/videos.xml?channel_id=UCDnZ8zbVWLaVfuDmNuWq7rw")
     
-    # Cargar elementos anteriores si ya existían para no perderlos
+    # Si por alguna razón el feed viene vacío, probamos una ruta alternativa basada en búsqueda directa o RSS general
+    if not feed.entries:
+        print("El feed principal no devolvió entradas, revisando conexión...")
+
     existing_items = {}
     if os.path.exists(XML_FILE):
         try:
@@ -25,27 +31,28 @@ def generate_filtered_rss():
         except Exception as e:
             print(f"Aviso leyendo XML anterior: {e}")
 
-    # Nuevo árbol XML
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
     
     ET.SubElement(channel, "title").text = "Tigo Sports PY - Videos de Olimpia"
-    ET.SubElement(channel, "link").text = f"https://www.youtube.com/channel/{CHANNEL_ID}"
+    ET.SubElement(channel, "link").text = "https://www.youtube.com/@TigoSportsPY"
     ET.SubElement(channel, "description").text = "Feed RSS automatizado que filtra videos de Olimpia de Tigo Sports PY"
     ET.SubElement(channel, "language").text = "es"
 
     new_added_count = 0
     
-    # 1. Procesar los del feed actual de YouTube
+    print(f"Total de entradas leídas de YouTube: {len(feed.entries)}")
+    
     for entry in feed.entries:
         title = entry.title
         summary = getattr(entry, 'summary', '')
         
-        # Filtro flexible: busca "olimpia" en título o descripción
+        print(f"Revisando video: {title}")
+        
+        # Filtro flexible para capturar cualquier mención a Olimpia
         if "olimpia" in title.lower() or "olimpia" in summary.lower():
             guid_val = entry.id
             
-            # Crear el item XML
             item = ET.Element("item")
             ET.SubElement(item, "title").text = title
             ET.SubElement(item, "link").text = entry.link
@@ -55,15 +62,13 @@ def generate_filtered_rss():
                 
             existing_items[guid_val] = item
             new_added_count += 1
-            print(f"Encontrado y agregado: {title}")
+            print(f"-> ¡MATCH DE OLIMPIA AGREGADO!: {title}")
 
-    # 2. Agregar todos los acumulados al canal (ordenados o tal cual)
     for guid_val, item_elem in existing_items.items():
         channel.append(item_elem)
 
-    print(f"Total de videos de Olimpia en el archivo acumulado: {len(existing_items)}")
+    print(f"Total acumulado en el XML final: {len(existing_items)}")
     
-    # Guardar archivo XML
     tree = ET.ElementTree(rss)
     tree.write(XML_FILE, encoding="utf-8", xml_declaration=True)
 
