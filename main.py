@@ -2,21 +2,13 @@ import feedparser
 import xml.etree.ElementTree as ET
 import os
 
-# Usamos la lista de reproducciones de subidas públicas de @TigoSportsPY
-# Esto evita problemas con IDs internos obsoletos de YouTube
 RSS_URL = "https://www.youtube.com/feeds/videos.xml?user=TigoSportsPY"
-# O alternativamente por playlist de subidas del canal principal
-ALT_RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=UCDnZ8zbVWLaVfuDmNuWq7rw" 
 XML_FILE = "olimpia.xml"
 
 def generate_filtered_rss():
-    print(f"Intentando leer feed...")
+    print(f"Leyendo feed de YouTube...")
     feed = feedparser.parse("https://www.youtube.com/feeds/videos.xml?channel_id=UCDnZ8zbVWLaVfuDmNuWq7rw")
     
-    # Si por alguna razón el feed viene vacío, probamos una ruta alternativa basada en búsqueda directa o RSS general
-    if not feed.entries:
-        print("El feed principal no devolvió entradas, revisando conexión...")
-
     existing_items = {}
     if os.path.exists(XML_FILE):
         try:
@@ -34,23 +26,20 @@ def generate_filtered_rss():
     rss = ET.Element("rss", version="2.0")
     channel = ET.SubElement(rss, "channel")
     
-    ET.SubElement(channel, "title").text = "Tigo Sports PY - Videos de Olimpia"
+    ET.SubElement(channel, "title").text = "Tigo Sports PY - Videos de Olimpia (Estricto)"
     ET.SubElement(channel, "link").text = "https://www.youtube.com/@TigoSportsPY"
-    ET.SubElement(channel, "description").text = "Feed RSS automatizado que filtra videos de Olimpia de Tigo Sports PY"
+    ET.SubElement(channel, "description").text = "Feed RSS automatizado con videos cuyo título dice Olimpia"
     ET.SubElement(channel, "language").text = "es"
 
     new_added_count = 0
     
-    print(f"Total de entradas leídas de YouTube: {len(feed.entries)}")
-    
     for entry in feed.entries:
         title = entry.title
-        summary = getattr(entry, 'summary', '')
         
-        print(f"Revisando video: {title}")
-        
-        # Filtro flexible para capturar cualquier mención a Olimpia
-        if "olimpia" in title.lower() or "olimpia" in summary.lower():
+        # --- FILTRO ESTRICTO ---
+        # Exigimos que la palabra "Olimpia" (o "olimpia") esté estrictamente dentro del TÍTULO del video.
+        # Si prefieres que coincida exactamente con mayúscula inicial, usa "Olimpia" en lugar de title.lower()
+        if "olimpia" in title.lower():
             guid_val = entry.id
             
             item = ET.Element("item")
@@ -62,7 +51,9 @@ def generate_filtered_rss():
                 
             existing_items[guid_val] = item
             new_added_count += 1
-            print(f"-> ¡MATCH DE OLIMPIA AGREGADO!: {title}")
+            print(f"-> [ESTRICTO] Agregado por título: {title}")
+        else:
+            print(f"x Ignorado (no dice Olimpia en el título): {title}")
 
     for guid_val, item_elem in existing_items.items():
         channel.append(item_elem)
